@@ -8,10 +8,10 @@
 
 /* EXPORTED_SYMBOLS is set so this file can be a JavaScript Module */
 var EXPORTED_SYMBOLS = ['AtDCore'];
-
+var error_object = new Object();
 function AtDCore() {
 	/* these are the categories of errors AtD should ignore */
-	this.ignore_types = ['Bias Language', 'Cliches', 'Complex Expression', 'Diacritical Marks', 'Double Negatives', 'Hidden Verbs', 'Jargon Language', 'Passive voice', 'Phrases to Avoid', 'Redundant Expression'];
+	this.ignore_types = [];//['Bias Language', 'Cliches', 'Complex Expression', 'Diacritical Marks', 'Double Negatives', 'Hidden Verbs', 'Jargon Language', 'Phrases to Avoid', 'Redundant Expression'];
 
 	/* these are the phrases AtD should ignore */
 	this.ignore_strings = {};
@@ -552,10 +552,10 @@ AtDCore.prototype.isIE = function() {
 
 var AtD = 
 {
-	rpc : '', /* see the proxy.php that came with the AtD/TinyMCE plugin */
+	rpc : '',
 	rpc_css : 'http://www.polishmywriting.com/atd-jquery/server/proxycss.php?data=', /* you may use this, but be nice! */
 	rpc_css_lang : 'en',
-	api_key : '',
+	api_key : 'csssdsproxy',
 	i18n : {},
 	listener : {}
 };
@@ -659,7 +659,7 @@ AtD.check = function(container_id, callback_f) {
 		url : AtD.rpc + '/checkDocument',
 		data : 'key=' + AtD.api_key + '&data=' + text,
 		format : 'raw', 
-		dataType : (jQuery.browser.msie) ? "text" : "xml",
+		dataType : (navigator.userAgent.match(/msie/i)) ? "text" : "xml",
 
 		error : function(XHR, status, error) {
 			if (AtD.callback_f != undefined && AtD.callback_f.error != undefined)
@@ -728,8 +728,11 @@ AtD.processXML = function(container_id, responseXML) {
 
 AtD.useSuggestion = function(word) {
 	this.core.applySuggestion(AtD.errorElement, word);
-
 	AtD.counter --;
+    /* adjust flag count */
+    var flag_id = "#"+AtD.container.split("_").slice(0,$("#slice_val").val()).join("_")+"_spelling_error_count";
+    $(flag_id).val(parseInt($(flag_id).val())-1);
+    /* adjust flag count */
 	if (AtD.counter == 0 && AtD.callback_f != undefined && AtD.callback_f.success != undefined)
 		AtD.callback_f.success(AtD.count);
 };
@@ -815,7 +818,7 @@ AtD.suggest = function(element) {
 
 	/* do the explain menu if configured */
 
-	if (AtD.callback_f != undefined && AtD.callback_f.explain != undefined && errorDescription['moreinfo'] != undefined) {
+	if (AtD.callback_f != undefined && AtD.callback_f.explain != undefined && errorDescription != undefined &&errorDescription['moreinfo'] != undefined) {
 		suggest.append('<a href="javascript:AtD.explainError()" class="spell_sep_top">' + AtD.getLang('menu_option_explain', 'Explain...') + '</a>');
 		AtD.explainURL = errorDescription['moreinfo'];
 	}
@@ -931,16 +934,17 @@ AtD.textareas = {};
 /* convienence method to restore the text area from the preview div */
 AtD.restoreTextArea = function(id) {
 	var options = AtD.textareas[id];
-
+    /* save error count for current text area */
+    error_object[AtD.container] = AtD.counter;
+    /* adjust flag count */
 	/* check if we're in the proofreading mode, if not... then retunr */
 	if (options == undefined || options['before'] == options['link'].html())
 		return;
 
 	/* clear the error HTML out of the preview div */
 	AtD.remove(id);
-
 	/* clear the AtD synchronization field */
-	jQuery('#AtD_sync_').remove();
+	jQuery('#AtD_sync_'+id).remove();
   
 	/* swap the preview div for the textarea, notice how I have to restore the appropriate class/id/style attributes */
 
@@ -1018,7 +1022,7 @@ AtD._checkTextArea = function(id, commChannel, linkId, after) {
 		var div;
 
 		var hidden = jQuery('<input type="hidden" />');
-		hidden.attr('id', 'AtD_sync_');
+		hidden.attr('id', 'AtD_sync_'+container.attr('id'));
 		hidden.val(container.val());
 		var name = container.attr('name');
 
@@ -1090,6 +1094,14 @@ AtD._checkTextArea = function(id, commChannel, linkId, after) {
 			ready: function(errorCount) {
 				/* this function is called when the AtD async service request has finished.
 				   this is a good time to allow the user to click the spell check/edit text link again. */
+                /*set or adjust flag count */
+                var flag_id = "#"+id.split("_").slice(0,$("#slice_val").val()).join("_")+"_spelling_error_count";
+                if(isNaN(error_object[id]))
+                  error_object[id] = 0;
+                $(flag_id).val(parseInt($(flag_id).val())+errorCount-error_object[id]);
+                error_object[id] = 0;
+                AtD.counter = 0;
+                /*set flag count */
 				options['link'].unbind('click', disableClick);
 			},
   
@@ -1101,10 +1113,11 @@ AtD._checkTextArea = function(id, commChannel, linkId, after) {
 
 			success: function(errorCount) {
 				if (errorCount == 0)
-					alert( AtD.getLang('message_no_errors_found', "No writing errors were found") );
+					console.log( AtD.getLang('message_no_errors_found', "No writing errors were found") );
 
 				/* once all errors are resolved, this function is called, it's an opportune time
 				   to restore the textarea */
+                AtD.counter = 0;
 				AtD.restoreTextArea( id );
 			},
 
@@ -1150,23 +1163,18 @@ jQuery.fn.addProofreader = function(options) {
 		var id = $this.attr('id');
 		var node = jQuery('<span></span>');
 		node.attr('id', 'AtD_' + parent.id++);
+        node.attr('class', 'hide atdBtn');
 		node.html(opts.proofread_content);
-		node.click(function(event) { 
-			if (AtD.current_id != undefined && AtD.current_id != id) {
-				AtD.restoreTextArea(AtD.current_id);
-			}
-
+		node.click(function(event) {
 			if (AtD.api_key != "" && AtD.rpc != "") {
 				AtD.checkTextArea(id, node.attr('id'), opts.edit_text_content);
  			}
 			else {
-				AtD.checkTextAreaCrossAJAX(id, node.attr('id'), opts.edit_text_content); 
+                AtD.restoreTextArea(id);
+				AtD.checkTextAreaCrossAJAX(id, node.attr('id'), opts.edit_text_content);
 			}
-
-			AtD.current_id = id;
 		});
 		$this.wrap('<div></div>');
-
 		/* attach a submit listener to the parent form */
 		$this.parents('form').submit(function(event) {
 			AtD.restoreTextArea(id);
@@ -1176,7 +1184,14 @@ jQuery.fn.addProofreader = function(options) {
 	});
 };
 
+jQuery.fn.removeProofreader = function(options) {
+    var parent = this;
+    this.each(function() {
+        AtD.restoreTextArea(this.id);
+    });
+};
+
 jQuery.fn.addProofreader.defaults = {
-	edit_text_content: '<span class="AtD_edit_button"></span>',
-	proofread_content: '<span class="AtD_proofread_button"></span>'
+	edit_text_content: '<span class="AtD_edit_button atdCheck"></span>',
+	proofread_content: '<span class="AtD_proofread_button atdCheck"></span>'
 };

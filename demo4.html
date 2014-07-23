@@ -22,7 +22,7 @@
  <!-- there are six things you need to make AtD work for you, they are: -->
 
  <!-- 1. include jQuery ... naturally none of this works without jQuery -->
- <script src="http://code.jquery.com/jquery-1.4.2.js"></script>
+ <script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
 
  <!-- 2. load the atd.textarea.js -- this script makes it easy to attach AtD to a textarea -->
  <script src="scripts/jquery.atd.textarea.js"></script>
@@ -35,12 +35,29 @@
 
  <!-- 6. a function to call when the button is clicked, this function calls into the AtD textarea code -->
  <script>
+
  function check()
  {
     AtD.checkTextAreaCrossAJAX('textInput', 'checkLink', 'Edit Text');
  }
- </script>
 
+ function check2()
+ {
+    AtD.checkTextAreaCrossAJAX('textInput2', 'checkLink2', 'Edit Text');
+ }
+
+ $(document).on('click', '#checkLink3', function(e){
+ 	e.preventDefault();
+ 	$.each($('.atdCheck'),function(index,element){
+ 		$(this)[0].click();
+ 		console.log(53);
+ 	   // AtD.checkTextAreaCrossAJAX($(this).data('id'), $(this).attr('id'), 'Edit Text');
+       // window[$(this).data('func')]()
+    });
+ });
+
+ </script>
+ 
  </head>
  <body>
  <p>This demo demonstrates how to use <a href="http://www.afterthedeadline.com">AtD</a> to check spelling and grammar in a textarea.</p>
@@ -49,7 +66,13 @@
 
 When the spell checker finds an questionable word, it highlights it and suggests the mpst likely variants too replace the questionable word. You can select the variant and replace the wrrd or leave the word unanged.</textarea>
 
- <p><img src="images/atdbuttontr.gif"><a href="javascript:check()" id="checkLink">Check Spelling</a></p>
+ <p><img src="images/atdbuttontr.gif"><a href="javascript:check()" data-id="textInput" data-func="check" id="checkLink" class='atdCheck'>Check Spelling</a></p>
 
+  <textarea id="textInput2" class="input">The purpoce of a spell checker is to check the text four spelling and typeing errors. The checker finds errors througout the text. 
+
+When the spell checker finds an questionable word, it highlights it and suggests the mpst likely variants too replace the questionable word. You can select the variant and replace the wrrd or leave the word unanged.</textarea>
+
+ <p><img src="images/atdbuttontr.gif"><a href="javascript:check2()" data-id="textInput2" data-func="check2" id="checkLink2" class='atdCheck'>Check Spelling</a></p>
+ <p><img src="images/atdbuttontr.gif"><a href="#" id="checkLink3">Checks Spelling</a></p>
  </body>
 </html>
